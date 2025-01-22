@@ -1,0 +1,171 @@
+# Modele cu date de tip panel
+
+# Cuprins:
+#   Declararea setului de date de tip panel
+#   Explorarea heterogeneitatii
+#   OLS (regresie liniara multipla)
+#   Model cu efecte fixe (FE - fixed effects) 
+#   Testarea ipoteze
+#   Model cu efecte aleatoare (RE - Random Effects)
+#   Testul Hausman pt efective fixe vs efecte aleatorii
+
+# Fisiere: 
+#   panel_data.xlsx
+
+# Install packages
+PackageNames <- c("tidyverse","gplots","plm","readxl","foreign","lmtest")
+for(i in PackageNames){
+  if(!require(i, character.only = T)){
+    install.packages(i, dependencies = T)
+    require(i, character.only = T)
+  }
+}
+
+# Exemplu: Analiza fenomenului antreprenoriatului in cadrul companiilor micro
+# la nivelul tarilor UE in perioada 2008-2019
+data <- read_excel("C:/Users/Admin/OneDrive - Academia de Studii Economice din Bucuresti/Documents/Materiale predare/Econometrie/SEMINAR/Seminar 11/Seminar 11 - Modele cu date de tip panel/panel_data.xlsx")
+
+# Statistici descriptive
+summary(data)
+
+# Declararea setului de date de tip panel
+pd.df <- pdata.frame(data, index = c("country","year"), drop.index = TRUE)
+
+# Corelatia dintre sme09/spatiu/timp
+dev.off()
+coplot(sme09 ~ year|country, type="l", data=data) 
+
+# Heterogeneitatea presupune ca exista diferente intre unitatile studiate
+
+# Explorarea heterogeneitatii in sectiunea transversala
+# Graficul traseaza un interval de incredere de 95% in jurul mediilor
+# Tari cu rata foarte mare si tari cu rata foarte mica => avem heterogeneitate transversala
+plotmeans(sme09 ~ country, main = 'Heterogeneitate in randul tarilor', data = data)
+
+# Explorarea heterogeneitatii in sectiunea temporala
+# Ani cu rata mare si ani cu rata mica => avem heterogeneitate temporala, 
+# dar mai mica decat in cazul heterogeneitatii transversale
+plotmeans(sme09 ~ year, main = 'Heterogeneitate in timp', data = data)
+
+
+# Model OLS - model clasic de regresie liniara
+# Nu ia in calcul heterogeneitatea intre spatiu si timp
+ols <- lm(sme09 ~ inflation+ internet_use + uncertainty_avoidance + 
+            government_regulation, data)
+summary(ols) #output
+yhat <- ols$fitted # valori estimate
+ggplot(data, aes(x=inflation, y=sme09))+ #sme09~inflatie
+  geom_point()+
+  geom_smooth(method='lm', se=FALSE)+
+  theme_bw()
+
+# Model FE (cu efecte fixe) 
+fe <- plm(sme09 ~ inflation+ internet_use + uncertainty_avoidance + 
+            government_regulation, data, index = c('country','year'),
+          model = 'within')
+summary(fe)
+# Unbalanced Panel: n = nr de paneluri
+#                   T = ani
+#                   N = nr total de observatii
+
+# Doar rata inflatiei este semnificativa, vom estima din nou modelul tinand
+# cont doar de rata inflatiei
+fe <- plm(sme09 ~ inflation, data, index = c('country','year'),
+          model = 'within')
+summary(fe)
+
+# In cadrul modelelor panel data, din cazua complexitatii, vom compara
+# p-value doar cu 0.05. Nu vom mai purta discutiile cu nivelurile de semnificatie 90%/95%/99%
+
+# Alegerea celei mai adecvate variante de model prin testarea intre regresie 
+# OLS vs fixed effects panel model
+# H0: OLS 
+# H1: FE
+pFtest(fe, ols) # p-value < 0.05 => se recomanda model de panel data FE
+
+# Model cu efecte aleatorii RE (random effects)
+re <- plm(sme09 ~ inflation, data, index = c('country','year'),
+          model = 'between')
+summary(re)
+
+# Testul Hausmann il utilizam pentru a decide intre FE si RE
+# H0: model cu efecte random 
+# H1: model cu efecte fixe
+phtest(fe,re) # p-value <0.05 => model cu efecte fixe se recomanda
+
+# Testare ipoteze model
+# In urma testului Hausmann am decis sa utilizam modelul FE
+
+# Testarea efectelor fixe in timp
+fixed.time <- plm(sme09 ~ inflation + factor(year), data=data, index=c("country",
+                                                             "year"), model="within")
+
+# H0:  nu sunt necesare efectele fixe in timp
+# H1:  sunt necesare efectele fixe in timp
+pFtest(fixed.time, fe) # p-value < 0.05 => se recomanda folosirea efectelor fixe in timp
+plmtest(fe, c('time'), type = 'bp') # p-value >0.05  => nu este nevoie sa se 
+# utilizeze efecte fixe in timp 
+
+# Cele doua teste sunt inconcluzive => vom alege varianta in care nu avem efecte fixe in timp
+
+# Testarea efectelor aleatorii cu Breusch-Pagan Lagrange Multiplier
+# Testul ne ajuta sa decidem intre RE si OLS 
+pool <- plm(sme09 ~ inflation, data=data, index=c("country", "year"), model="pooling")
+summary(pool)
+
+# H0: variatiile in timp sunt 0
+# H1: variatiile in timp sunt diferite de 0
+plmtest(pool, type=c("bp")) # p-value < 0.05 => respingem ipoteza nula
+# variatiile in timp sunt diferite de 0 => efectele aleatorii sunt adecvate a.i.
+# exista diferente semnificative intre tari
+
+
+# Testarea dependentei transversale folosind testul Breusch-Pagan LM si 
+# testul Parasan CD
+
+# Potrivit lui Baltagi, dependenta transversala este o problema intalnita
+# in randul seturilor de date panel cu serii de timp lungi. Aceasta problema
+# este rar intalnita in cazul panel data cu serii de timp scurte
+
+# Ipoteze teste
+# H0: reziduurile intre entitati nu sunt corelate
+# H1: reziduurile intre entitati sunt corelate
+
+pcdtest(fe, test = 'lm') # p-value <0.05 => dependenta transversala
+pcdtest(fe, test = 'cd') # pvalue<0.05 => dependenta transversala
+# Nu corectam pt ca avem panel mic. daca aveam serie de timp 40 perioade +
+# trebuia sa corectam
+
+
+# Testarea autocorelarii - Breusch-Godfrey/Wooldridge test 
+# Testul se aplica doar cand seriile de timp sunt lungi. In acest caz nu 
+# pune probleme setul de date deoarece avem date pe 12 ani
+
+# H0: Nu exista autocorelate
+# H1: autocorelarea este prezenta
+pbgtest(fe) # p-value <0.05 => avem autocorelare dar fiind panelul mic
+# o vom ignora
+
+
+# Testarea heteroschedasticitatii cu testul Breusch-Pagan
+# H0: homoschedasticitate
+# H1: heteroschedasticitate
+bptest(sme09 ~ inflation + factor(country), data = data, studentize=F)
+# deoarece p-value <0.05 => avem heteroschedasticitate
+
+# Nu vom corecta, deoarece este dificil si nu intra in materia de licenta
+# doar testam. Daca cineva doreste sa corecteze heteroschedasticitate
+# se poate ghida dupa modelul prezentarii de la Universitatea Princeton
+# https://www.princeton.edu/~otorres/Panel101R.pdf
+# Daca doriti sa aprofundati si mai mult, recomand sa urmariti ghidul
+# pachetului plm din R: https://cran.r-project.org/web/packages/plm/plm.pdf
+
+
+# Testarea efectelor random 
+pFtest(re, ols) # p-value > 0.05 => nu se recomanda efecte random.
+plmtest(re, c('time'), type = 'bp') # p-value > 0.05 => nu se recomanda efecte random
+# Desi nu se recomanda, mai jos aveti testele care trebuie aplicate la proiect
+# in cazul in care testul Hausmann recomanda efectele random
+pbgtest(re) # p-value > 0.05 => nu exista autocorelare
+bptest(sme09 ~ inflation + factor(year), data = data, studentize=F) # p-value > 0.05 => nu exista hetero
+
