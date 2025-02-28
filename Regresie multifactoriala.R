@@ -150,7 +150,7 @@ summary(model_multiple1)
 # p-value este 0.00445 < 0.01, coeficientul este semnificativ statistic--> accesul la apă influențează semnificativ speranța de viață.
 
 #Interpretare bonitate model:
-#Adjusted R-squared (0.7301) indică faptul că aproape 73.01% din variabilitatea speranței de viață este explicată de modelul. Ne axăm pe interpretarea R^2 ajustat, deoarece R^2 creste cand adaugam v.i chiar daca acesti nu au o semnificatie statictica, iar R^2 ajustat penalizează modelele cu v.i care nu sunt semnificative
+#Adjusted R-squared (0.7301) indică  faptul că aproape 73.01% din variabilitatea speranței de viață este explicată de modelul. Ne axăm pe interpretarea R^2 ajustat, deoarece R^2 creste cand adaugam v.i chiar daca acesti nu au o semnificatie statictica, iar R^2 ajustat penalizează modelele cu v.i care nu sunt semnificative
 #observam ca R-squared ajustat crește de la 0.6753 la 0.7301, iar acest lucru sugerează că variabila Water_Access_Percent aduce o îmbunătățire reală a modelului, nu doar o creștere artificială a R-squared
 
 #Testarea validitatii modelului (cu testul F)
